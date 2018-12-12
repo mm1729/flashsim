@@ -30,6 +30,9 @@
 #include <vector>
 #include <queue>
 #include <map>
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/identity.hpp>
 #include <boost/multi_index/ordered_index.hpp>
@@ -771,6 +774,8 @@ public:
 	Block *get_block_pointer(const Address & address);
 
 	Address resolve_logical_address(unsigned int logicalAddress);
+
+	std::mutex get_prod_lock();
 protected:
 	Controller &controller;
 };
@@ -783,12 +788,19 @@ public:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status trim(Event &event);
+	void stop();
+	bool running;
+	void read_(Event &event);
+	void write_(Event &event);
 private:
 	ulong currentPage;
 	ulong numPagesActive;
 	bool *trim_map;
 	long *map;
+	void consume();
 };
+
+
 
 class FtlImpl_Bast : public FtlParent
 {
@@ -1004,6 +1016,18 @@ public:
 	Stats stats;
 	void print_ftl_statistics();
 	const FtlParent &get_ftl(void) const;
+
+//--------------------------------------------
+// variables to make producer consumer relationship
+	std::queue<Event> requests;
+	std::mutex mtx;
+	std::condition_variable cv;
+	int num_requests;
+	double total_time_taken;
+	double get_time_taken();
+	void reset_time_taken();
+//---------------------------------------------
+
 private:
 	enum status issue(Event &event_list);
 	void translate_address(Address &address);
@@ -1020,6 +1044,60 @@ private:
 	Ssd &ssd;
 	FtlParent *ftl;
 };
+
+
+class Request 
+{
+	Event* event;
+	FtlParent* ftl;
+
+public:
+	Request(Event* event, FtlParent* ftl);
+	void setValue(Event* event);
+	void setFtlImpl(FtlParent* ftl);
+	void process();
+	//void finish();
+};
+
+class Worker
+{
+	std::condition_variable cv;
+	std::mutex mtx;
+	std::unique_lock<std::mutex> ulock;
+	std::queue<Request*> requests;
+	std::mutex requests_mutex;
+	bool running;
+	bool ready;
+public:
+	Worker() {running = true; ready = false; ulock=std::unique_lock<std::mutex>(mtx);}
+	void run();
+	void stop() {running = false;}
+	void addRequest(Request* event) {this->requests.push(event); ready = true; }
+	void getCondition(std::condition_variable* &cv);
+	void getMutex(std::mutex* &mtx);
+};
+
+class Dispatcher
+{
+	//std::queue<Worker*> workers;
+	//std::mutex requests_mutex;
+	std::mutex workers_mutex;
+	std::vector<Worker*>* all_workers;
+	std::vector<std::thread*>* threads;
+	Controller &controller;
+	FtlParent* ftl;
+	bool running;
+	std::thread* main_thread;
+
+public:
+	Dispatcher(const ssd::uint workers, Controller &controller, FtlParent* ftl);
+	bool stop();
+	void addRequest(Event* request);
+	void addWorker(Worker* worker);
+	void consume();
+};
+
+
 
 /* The SSD is the single main object that will be created to simulate a real
  * SSD.  Creating a SSD causes all other objects in the SSD to be created.  The
@@ -1041,6 +1119,8 @@ public:
 
 	void print_ftl_statistics();
 	double ready_at(void);
+	double get_time_taken();
+	void reset_time_taken();
 private:
 	enum status read(Event &event);
 	enum status write(Event &event);

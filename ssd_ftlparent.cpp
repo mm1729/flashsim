@@ -73,3 +73,11 @@ void FtlParent::print_ftl_statistics()
 {
 	return;
 }
+
+//------------------------
+/*std::mutex get_prod_lock()
+{
+	return controller.mtx;
+}*/
+
+//------------------------

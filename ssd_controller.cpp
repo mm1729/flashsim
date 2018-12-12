@@ -38,9 +38,18 @@
 
 using namespace ssd;
 
+//----------------------------------
+Dispatcher* dispatcher;
+//----------------------------------
+
 Controller::Controller(Ssd &parent):
 	ssd(parent)
 {
+
+	//-----------------------------
+	// Initialize requests done statically
+	//------------------------------
+	total_time_taken = 0;
 	switch (FTL_IMPLEMENTATION)
 	{
 	case 0:
@@ -59,6 +68,8 @@ Controller::Controller(Ssd &parent):
 		ftl = new FtlImpl_BDftl(*this);
 		break;
 	}
+	dispatcher = new Dispatcher(SSD_SIZE, *this, ftl);
+	printf("created dipatcher\n");
 	return;
 }
 
@@ -70,7 +81,15 @@ Controller::~Controller(void)
 
 enum status Controller::event_arrive(Event &event)
 {
-	if(event.get_event_type() == READ)
+	printf("in event_arrive\n");
+	//------------------------------
+	std::unique_lock<std::mutex> lck(mtx);
+	requests.push(event);
+	num_requests++;
+	cv.notify_one();
+	return SUCCESS;
+	//------------------------------
+	/*if(event.get_event_type() == READ)
 		return ftl->read(event);
 	else if(event.get_event_type() == WRITE)
 		return ftl->write(event);
@@ -78,7 +97,7 @@ enum status Controller::event_arrive(Event &event)
 		return ftl->trim(event);
 	else
 		fprintf(stderr, "Controller: %s: Invalid event type\n", __func__);
-	return FAILURE;
+	return FAILURE;*/
 }
 
 enum status Controller::issue(Event &event_list)
@@ -138,8 +157,17 @@ enum status Controller::issue(Event &event_list)
 			fprintf(stderr, "Controller: %s: Invalid event type\n", __func__);
 			return FAILURE;
 		}
+		total_time_taken += cur->get_time_taken();
 	}
 	return SUCCESS;
+}
+
+double Controller::get_time_taken() {
+	return total_time_taken;
+}
+
+void Controller::reset_time_taken() {
+	total_time_taken = 0;
 }
 
 void Controller::translate_address(Address &address)

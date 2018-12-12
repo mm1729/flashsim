@@ -24,8 +24,15 @@
 #include <stdio.h>
 #include <math.h>
 #include "../ssd.h"
+#include <thread>
+#include <mutex>
+#include <condition_variable>
 
 using namespace ssd;
+
+/*std::thread main_thread;
+bool running;
+Dispatcher* dispatcher;*/
 
 FtlImpl_Page::FtlImpl_Page(Controller &controller):
 	FtlParent(controller)
@@ -34,6 +41,13 @@ FtlImpl_Page::FtlImpl_Page(Controller &controller):
 
 	numPagesActive = 0;
 
+	//running = true;
+	//main_thread = std::thread(&FtlImpl_Page::consume, this);
+
+	//printf("here in creating thread\n");
+
+	//main_thread.join();
+
 	return;
 }
 
@@ -41,6 +55,50 @@ FtlImpl_Page::~FtlImpl_Page(void)
 {
 
 	return;
+}
+
+/*void stop(void)
+{
+	running = false;
+}*/
+
+/*void FtlImpl_Page::consume(void)
+{
+	//printf("here\n");
+	//int wait = 0;
+	while(running) {
+		{
+			printf("here2\n");
+			std::unique_lock<std::mutex> lck(controller.mtx);
+			while (controller.num_requests == 0) {
+				//wait++;
+				controller.cv.wait(lck);
+			}
+			//printf("waited for %d\n", wait);
+			//wait = 0;
+			Event event = controller.requests.front();
+			controller.requests.pop();
+
+
+			dispatcher->addRequest(&event);			
+
+			printf(" after requests added \n num controller requests %d\n", controller.num_requests);
+
+			controller.num_requests--;
+
+			// remove later
+			//if(controller.num_requests != 0) controller.num_requests--;
+		}
+	}
+}*/
+
+void FtlImpl_Page::read_(Event &event) {
+	event.set_address(Address(0, PAGE));
+	event.set_noop(true);
+
+	controller.stats.numFTLRead++;
+
+	controller.issue(event);
 }
 
 enum status FtlImpl_Page::read(Event &event)

@@ -136,6 +136,16 @@ double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size,
 	return event_arrive(type, logical_address, size, start_time, NULL);
 }
 
+double Ssd::get_time_taken()
+{
+	return controller.get_time_taken();
+}
+
+void Ssd::reset_time_taken()
+{
+	return controller.reset_time_taken();
+}
+
 /* This is the function that will be called by DiskSim
  * Provide the event (request) type (see enum in ssd.h),
  * 	logical_address (page number), size of request in pages, and the start

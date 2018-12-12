@@ -48,8 +48,19 @@ double do_seq(Ssd *ssd, event_type type, void *test, unsigned int file_size)
 		{
 			if (ssd->get_result_buffer() == NULL)
 				printf("Data has not been written\n");
-			else if (memcmp(ssd->get_result_buffer(), (char*)test + adr, PAGE_SIZE) != 0)
+			else if (memcmp(ssd->get_result_buffer(), (char*)test + adr, PAGE_SIZE) != 0) {
 				fprintf(stderr, "i: %i ", i);
+			}
+				/*printf("%d\n", adr);
+				printf("%.*s\n", PAGE_SIZE, (char*) (ssd->get_result_buffer()));
+				//printf("\n");
+				printf("%.*s\n", PAGE_SIZE, (char*)test + adr);
+				if(*((char*) test+adr) == '\0') {
+					printf("yes\n");
+				} else {
+					printf("no\n");
+				}*/
+				
 		}
 		i++;
 	}
@@ -116,13 +127,19 @@ int main(int argc, char** argv)
 	struct stat st;
 	fstat(fd, &st);
 
-	void *test_data = mmap(NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+	void *test_data = mmap(NULL, st.st_size, PROT_READ|PROT_WRITE, MAP_PRIVATE, fd, 0);
 
 	if (test_data == MAP_FAILED)
 		fprintf(stderr, "File not mapped.");
 
 	printf("Size of testfile: %iKB\n", (int)st.st_size/1024);
 
+	/*char* write_test_data = (char*) malloc(st.st_size);
+	for(int i = 0; i < st.st_size; i++) {
+		*(write_test_data + i) = i;
+	}
+	memcpy(test_data, write_test_data, st.st_size);
+	msync(test_data, st.st_size, MS_SYNC);*/
 	/*
 	 * Experiment setup
 	 * 1. Do linear write and read.
@@ -176,8 +193,8 @@ int main(int argc, char** argv)
 //	printf("Test 8. Write backward sequential test data again.\n");
 //	result += do_seq_backward(ssd, WRITE, test_data, st.st_size);
 //
-//	printf("Test 9. Read backward sequential test data.\n");
-//	result += do_seq_backward(ssd, READ, test_data, st.st_size);
+	printf("Test 9. Read backward sequential test data.\n");
+	result += do_seq_backward(ssd, READ, test_data, st.st_size);
 
 	printf("Write time: %.10lfs\n", result);
 
