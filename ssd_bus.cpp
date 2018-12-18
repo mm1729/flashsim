@@ -117,6 +117,9 @@ enum status Bus::disconnect(uint channel)
  */
 enum status Bus::lock(uint channel, double start_time, double duration, Event &event)
 {
+	//if(channels != NULL && start_time >= 0.0 && duration > 0.0) {
+		//printf("channels: %d start_time %f duration %f\n", channels == NULL, start_time, duration);
+	//}
 	assert(channels != NULL && start_time >= 0.0 && duration > 0.0);
 	return channels[channel].lock(start_time, duration, event);
 }

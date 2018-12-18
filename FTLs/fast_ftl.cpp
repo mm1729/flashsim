@@ -601,3 +601,10 @@ void FtlImpl_Fast::print_ftl_statistics()
 	Block_manager::instance()->print_statistics();
 }
 
+void FtlImpl_Fast::read_(Event &event) {
+	return;
+}
+
+void FtlImpl_Fast::write_(Event &event) {
+	return;
+}

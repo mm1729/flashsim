@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <queue>
 
+
 using namespace ssd;
 
 
@@ -15,22 +16,24 @@ Dispatcher::Dispatcher(const ssd::uint workers, Controller &controller, FtlParen
     this->ftl = ftl;
     this->all_workers = new std::vector<Worker*>();
     this->threads = new std::vector<std::thread*>();
+    ulock=std::unique_lock<std::mutex>(ulock_mtx);
     std::thread* t = 0;
     Worker* w = 0;
-    printf("if null: %s\n", w);
+    //printf("if null: %s\n", w);
     for(int i = 0; i < workers; i++) {
         w = new Worker();
-        printf("w: %s ", w);
+        //printf("w: %s ", w);
         all_workers->push_back(w);
-        printf("pushed worker\n");
-        t = new std::thread(&Worker::stop, w);
-        t->join();
-        printf("why???\n");
+        //printf("pushed worker\n");
+        //t = new std::thread(&Worker::stop, w);
+        //t->join();
+        //printf("why???\n");
         t = new std::thread(&Worker::run, w);
-        printf("t: %s ", t);
-        printf("initalized thread\n");
+        //printf("t: %s ", t);
+        //printf("initalized thread\n");
         threads->push_back(t);
-        printf("pushed thread\n");
+        //printf("pushed thread\n");
+        t->detach();
         w = 0;
         t = 0;
     }
@@ -41,31 +44,41 @@ Dispatcher::Dispatcher(const ssd::uint workers, Controller &controller, FtlParen
 
 void Dispatcher::consume() {
     while(running) {
-        Event* event = NULL ;
-		{
-			printf("here2\n");
-			std::unique_lock<std::mutex> lck(controller.mtx);
-			while (controller.num_requests == 0) {
-				//wait++;
-				controller.cv.wait(lck);
-			}
-			//printf("waited for %d\n", wait);
-			//wait = 0;
-			event = &controller.requests.front();
-			controller.requests.pop();
+ 
+        controller.mtx.lock();
+        if(controller.num_requests > 0 && !controller.requests.empty()) {
+        
+            Event event = controller.requests.front();
+            controller.requests.pop();
+            controller.num_requests--;
+            controller.mtx.unlock();
+
+            /*if(event.get_logical_address() != 10 || event.get_event_type() != WRITE) {
+		        fprintf(stderr, "In func: %s: address %ud \n", __func__, event.get_logical_address());
+	        }*/
+            
+            //process request
+            if(&event != NULL) {
+                //controller.add_controller_request(event);
+                this->addRequest(event);
+            }
+            //printf(" num dispatcher consumer requests %d\n", controller.num_requests);
+
+
+
+
+        } else {
+            controller.mtx.unlock();
+
+            while (controller.num_requests == 0) {
+                //wait++;
+                if(controller.cv.wait_for(this->ulock, std::chrono::seconds(1)) == std::cv_status::timeout ) {
+                        // keep waiting until woken up by producer 
+                        //break;
+                }
+            }
+
         }
-
-        if(event != NULL) {
-            this->addRequest(event);
-        }
-			
-
-        printf(" after requests added \n num controller requests %d\n", controller.num_requests);
-
-        controller.num_requests--;
-
-        // remove later
-        //if(controller.num_requests != 0) controller.num_requests--;
 
 	}
 }
@@ -80,15 +93,22 @@ bool Dispatcher::stop() {
     }
 }
 
-void Dispatcher::addRequest(Event* event) {
+void Dispatcher::addRequest(Event &event) {
     Request* rq = new Request(event, ftl);
 
     // Get the logical package of the address
-    Address* address = new Address();
-    address->set_linear_address(event->get_logical_address());
-    uint package = address->package;
-    delete address; // don't need this anymore
+    //printf("setting address of event %d\n", event==0);
+    if(&event.get_address() == NULL) {
+        printf("got null address\n");
+    }
 
+    /*if(event.get_logical_address() != 10 || event.get_event_type() != WRITE) {
+		fprintf(stderr, "In func: %s: address %ud \n", __func__, event.get_logical_address());
+	}*/
+    uint package = event.get_address().package;
+
+
+    //printf("calling worker %d\n", package);
     workers_mutex.lock();
     // put the request in correct worker request queue
     Worker* worker = (*all_workers)[package];
@@ -97,9 +117,9 @@ void Dispatcher::addRequest(Event* event) {
     requests_mtx->lock();
     worker->addRequest(rq);
 
-    std::condition_variable* cv;
-    worker->getCondition(cv);
-    cv->notify_one(); // notify thread a request is added
+    std::condition_variable* worker_cv;
+    worker->getCondition(worker_cv);
+    worker_cv->notify_one(); // notify thread a request is added
 
     requests_mtx->unlock();
     workers_mutex.unlock();        

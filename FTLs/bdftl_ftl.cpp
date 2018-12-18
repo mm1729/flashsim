@@ -453,3 +453,10 @@ void FtlImpl_BDftl::print_ftl_statistics()
 	Block_manager::instance()->print_statistics();
 }
 
+void FtlImpl_BDftl::read_(Event &event) {
+	return;
+}
+
+void FtlImpl_BDftl::write_(Event &event) {
+	return;
+}

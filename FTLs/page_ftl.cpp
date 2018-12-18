@@ -93,12 +93,45 @@ FtlImpl_Page::~FtlImpl_Page(void)
 }*/
 
 void FtlImpl_Page::read_(Event &event) {
-	event.set_address(Address(0, PAGE));
+	//event.set_address(Address(0, PAGE));
+	/*if(event.get_logical_address() != 10) {
+		fprintf(stderr, "In func: %s: address %ud \n", __func__, event.get_logical_address());
+	}*/
 	event.set_noop(true);
 
 	controller.stats.numFTLRead++;
 
-	controller.issue(event);
+	//controller.issue(event);
+	controller.add_controller_request(event);
+}
+
+void FtlImpl_Page::write_(Event &event)
+{
+	//event.set_address(Address(1, PAGE));
+	event.set_noop(true);
+
+	controller.stats.numFTLWrite++;
+
+	if (numPagesActive == NUMBER_OF_ADDRESSABLE_BLOCKS * BLOCK_SIZE)
+	{
+		numPagesActive -= BLOCK_SIZE;
+
+		Event eraseEvent = Event(ERASE, event.get_logical_address(), 1, event.get_start_time());
+		eraseEvent.set_address(Address(0, PAGE));
+
+		controller.add_controller_request(eraseEvent);
+
+		//if (controller.issue(eraseEvent) == FAILURE) printf("Erase failed");
+
+		//event.incr_time_taken(eraseEvent.get_time_taken());
+
+		controller.stats.numFTLErase++;
+	}
+
+	numPagesActive++;
+
+
+	controller.add_controller_request(event);
 }
 
 enum status FtlImpl_Page::read(Event &event)

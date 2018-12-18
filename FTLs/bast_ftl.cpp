@@ -408,3 +408,10 @@ void FtlImpl_Bast::print_ftl_statistics()
 	Block_manager::instance()->print_statistics();
 }
 
+void FtlImpl_Bast::read_(Event &event) {
+	return;
+}
+
+void FtlImpl_Bast::write_(Event &event) {
+	return;
+}

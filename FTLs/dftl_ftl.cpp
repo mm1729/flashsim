@@ -219,3 +219,11 @@ void FtlImpl_Dftl::print_ftl_statistics()
 {
 	Block_manager::instance()->print_statistics();
 }
+
+void FtlImpl_Dftl::read_(Event &event) {
+	return;
+}
+
+void FtlImpl_Dftl::write_(Event &event) {
+	return;
+}

@@ -171,6 +171,9 @@ double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size,
 		exit(MEM_ERR);
 	}
 
+	event->set_address(new Address(logical_address, PAGE));
+	//printf("setting package %d\n", logical_address);
+
 	event->set_payload(buffer);
 
 	if(controller.event_arrive(*event) != SUCCESS)
@@ -181,7 +184,7 @@ double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size,
 
 	/* use start_time as a temporary for returning time taken to service event */
 	start_time = event -> get_time_taken();
-	delete event;
+	//delete event;
 	return start_time;
 }
 
@@ -202,6 +205,7 @@ void *Ssd::get_result_buffer()
  * 	have Package do anything but update its statistics and pass on to Die */
 enum status Ssd::read(Event &event)
 {
+	if (data == NULL) printf("data is NULL\n");
 	assert(data != NULL && event.get_address().package < size && event.get_address().valid >= PACKAGE);
 	return data[event.get_address().package].read(event);
 }

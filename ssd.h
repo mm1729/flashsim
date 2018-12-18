@@ -395,8 +395,9 @@ public:
 	double incr_bus_wait_time(double time);
 	double incr_time_taken(double time_incr);
 	void print(FILE *stream = stdout);
-private:
+	//double current_time;
 	double start_time;
+private:
 	double time_taken;
 	double bus_wait_time;
 	enum event_type type;
@@ -776,6 +777,8 @@ public:
 	Address resolve_logical_address(unsigned int logicalAddress);
 
 	std::mutex get_prod_lock();
+	virtual void read_(Event &event) = 0;
+	virtual void write_(Event &event) = 0;
 protected:
 	Controller &controller;
 };
@@ -810,6 +813,8 @@ public:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status trim(Event &event);
+	void read_(Event &event);
+	void write_(Event &event);
 private:
 	std::map<long, LogPageBlock*> log_map;
 
@@ -837,6 +842,8 @@ public:
 	enum status read(Event &event);
 	enum status write(Event &event);
 	enum status trim(Event &event);
+	void read_(Event &event);
+	void write_(Event &event);
 private:
 	void initialize_log_pages();
 
@@ -876,6 +883,8 @@ public:
 	virtual enum status read(Event &event) = 0;
 	virtual enum status write(Event &event) = 0;
 	virtual enum status trim(Event &event) = 0;
+	virtual void read_(Event &event) = 0;
+	virtual void write_(Event &event) = 0;
 protected:
 	struct MPage {
 		long vpn;
@@ -943,6 +952,8 @@ public:
 	enum status trim(Event &event);
 	void cleanup_block(Event &event, Block *block);
 	void print_ftl_statistics();
+	void read_(Event &event);
+	void write_(Event &event);
 };
 
 class FtlImpl_BDftl : public FtlImpl_DftlParent
@@ -954,6 +965,8 @@ public:
 	enum status write(Event &event);
 	enum status trim(Event &event);
 	void cleanup_block(Event &event, Block *block);
+	void read_(Event &event);
+	void write_(Event &event);
 private:
 	struct BPage {
 		uint pbn;
@@ -1026,10 +1039,22 @@ public:
 	double total_time_taken;
 	double get_time_taken();
 	void reset_time_taken();
+
+// variables to issue events to SSD
+	std::queue<Event> c_requests;
+	std::mutex c_mtx;
+	std::condition_variable c_cv;
+	int num_c_requests;
+	void add_controller_request(Event e);
+	void consumer();
+	bool c_running;
+	std::unique_lock<std::mutex> ulock;
+	std::mutex ulock_mtx;
 //---------------------------------------------
+	enum status issue(Event &event_list);
+	void addRequestToWorker(Event &event);
 
 private:
-	enum status issue(Event &event_list);
 	void translate_address(Address &address);
 	ssd::ulong get_erases_remaining(const Address &address) const;
 	void get_least_worn(Address &address) const;
@@ -1048,14 +1073,15 @@ private:
 
 class Request 
 {
-	Event* event;
+	Event &event;
 	FtlParent* ftl;
 
 public:
-	Request(Event* event, FtlParent* ftl);
-	void setValue(Event* event);
+	Request(Event &event, FtlParent* ftl);
+	void setValue(Event &event);
 	void setFtlImpl(FtlParent* ftl);
 	void process();
+	Event getValue();
 	//void finish();
 };
 
@@ -1064,15 +1090,15 @@ class Worker
 	std::condition_variable cv;
 	std::mutex mtx;
 	std::unique_lock<std::mutex> ulock;
-	std::queue<Request*> requests;
+	std::queue<Request*>* requests;
 	std::mutex requests_mutex;
 	bool running;
 	bool ready;
 public:
-	Worker() {running = true; ready = false; ulock=std::unique_lock<std::mutex>(mtx);}
+	Worker();
 	void run();
 	void stop() {running = false;}
-	void addRequest(Request* event) {this->requests.push(event); ready = true; }
+	void addRequest(Request* event);
 	void getCondition(std::condition_variable* &cv);
 	void getMutex(std::mutex* &mtx);
 };
@@ -1084,6 +1110,8 @@ class Dispatcher
 	std::mutex workers_mutex;
 	std::vector<Worker*>* all_workers;
 	std::vector<std::thread*>* threads;
+	std::unique_lock<std::mutex> ulock;
+	std::mutex ulock_mtx;
 	Controller &controller;
 	FtlParent* ftl;
 	bool running;
@@ -1092,11 +1120,29 @@ class Dispatcher
 public:
 	Dispatcher(const ssd::uint workers, Controller &controller, FtlParent* ftl);
 	bool stop();
-	void addRequest(Event* request);
+	void addRequest(Event &request);
 	void addWorker(Worker* worker);
 	void consume();
 };
 
+class Controller_Worker
+{
+	std::condition_variable cv;
+	std::mutex mtx;
+	std::unique_lock<std::mutex> ulock;
+	std::queue<Event>* requests;
+	std::mutex requests_mutex;
+	bool running;
+	bool ready;
+	Controller &controller;
+public:
+	Controller_Worker(Controller &controller);
+	void run();
+	void stop() {running = false;}
+	void addRequest(Event &event);
+	void getCondition(std::condition_variable* &cv);
+	void getMutex(std::mutex* &mtx);
+};
 
 
 /* The SSD is the single main object that will be created to simulate a real

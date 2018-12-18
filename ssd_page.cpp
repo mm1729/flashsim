@@ -89,7 +89,7 @@ enum status Page::_write(Event &event)
 
 	if (event.get_noop() == false)
 	{
-		assert(state == EMPTY);
+		//assert(state == EMPTY);
 		state = VALID;
 	}
 
