@@ -39,7 +39,8 @@
 #include <boost/multi_index/member.hpp>
 #include <boost/multi_index/global_fun.hpp>
 #include <boost/multi_index/random_access_index.hpp>
- 
+#include <chrono>
+
 #ifndef _SSD_H
 #define _SSD_H
 
@@ -397,6 +398,11 @@ public:
 	void print(FILE *stream = stdout);
 	//double current_time;
 	double start_time;
+	int64_t getTime();
+	int64_t starttime;
+	int64_t ftltime;
+	int64_t controllertime;
+	int64_t finishtime;
 private:
 	double time_taken;
 	double bus_wait_time;
@@ -1054,6 +1060,8 @@ public:
 	enum status issue(Event &event_list);
 	void addRequestToWorker(Event &event);
 
+	void get_timing(int* ptr_reach_ftl, int * ptr_in_ftl, int* ptr_in_controller);
+
 private:
 	void translate_address(Address &address);
 	ssd::ulong get_erases_remaining(const Address &address) const;
@@ -1073,10 +1081,9 @@ private:
 
 class Request 
 {
+public:
 	Event &event;
 	FtlParent* ftl;
-
-public:
 	Request(Event &event, FtlParent* ftl);
 	void setValue(Event &event);
 	void setFtlImpl(FtlParent* ftl);
@@ -1167,6 +1174,7 @@ public:
 	double ready_at(void);
 	double get_time_taken();
 	void reset_time_taken();
+	void get_timing(int* ptr_reach_ftl, int * ptr_in_ftl, int* ptr_in_controller);
 private:
 	enum status read(Event &event);
 	enum status write(Event &event);

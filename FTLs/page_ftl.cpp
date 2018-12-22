@@ -93,6 +93,7 @@ FtlImpl_Page::~FtlImpl_Page(void)
 }*/
 
 void FtlImpl_Page::read_(Event &event) {
+	event.ftltime = event.getTime();
 	//event.set_address(Address(0, PAGE));
 	/*if(event.get_logical_address() != 10) {
 		fprintf(stderr, "In func: %s: address %ud \n", __func__, event.get_logical_address());
@@ -101,12 +102,15 @@ void FtlImpl_Page::read_(Event &event) {
 
 	controller.stats.numFTLRead++;
 
+	Event* cur = &event;
+
 	//controller.issue(event);
 	controller.add_controller_request(event);
 }
 
 void FtlImpl_Page::write_(Event &event)
 {
+	event.ftltime = event.getTime();
 	//event.set_address(Address(1, PAGE));
 	event.set_noop(true);
 
@@ -130,12 +134,12 @@ void FtlImpl_Page::write_(Event &event)
 
 	numPagesActive++;
 
-
 	controller.add_controller_request(event);
 }
 
 enum status FtlImpl_Page::read(Event &event)
 {
+	event.ftltime = event.getTime();
 	event.set_address(Address(0, PAGE));
 	event.set_noop(true);
 
@@ -146,6 +150,7 @@ enum status FtlImpl_Page::read(Event &event)
 
 enum status FtlImpl_Page::write(Event &event)
 {
+	event.ftltime = event.getTime();
 	event.set_address(Address(1, PAGE));
 	event.set_noop(true);
 
@@ -167,6 +172,10 @@ enum status FtlImpl_Page::write(Event &event)
 
 	numPagesActive++;
 
+	Event* cur = &event;
+	if(cur->ftltime < 0 ) {
+		printf("before ftl %ld %ld %ld %ld\n", cur->starttime, cur->ftltime, cur->controllertime, cur->finishtime);
+	}
 
 	return controller.issue(event);
 }

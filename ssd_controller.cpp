@@ -45,6 +45,10 @@ std::thread* consumer_thread;
 std::vector<std::thread*>* threads;
 std::vector<Controller_Worker*>* all_workers;
 std::atomic<int> pending_requests;
+std::atomic<int64_t> reach_ftl;
+std::atomic<int64_t> in_ftl;
+std::atomic<int64_t> in_controller;
+
 //----------------------------------
 
 Controller::Controller(Ssd &parent):
@@ -52,7 +56,7 @@ Controller::Controller(Ssd &parent):
 {
 	// start worker threads
 
-	/*all_workers = new std::vector<Controller_Worker*>();
+	all_workers = new std::vector<Controller_Worker*>();
     threads = new std::vector<std::thread*>();
     std::thread* t = 0;
     Controller_Worker* w = 0;
@@ -73,7 +77,7 @@ Controller::Controller(Ssd &parent):
         t->detach();
         w = 0;
         t = 0;
-    }*/
+    }
 
 	// start consumer thread
 	c_running = true;
@@ -121,7 +125,8 @@ enum status Controller::event_arrive(Event &event)
 	//printf("in event_arrive\n");
 	//------------------------------
 	mtx.lock();
-	event.start_time = total_time_taken;
+	event.start_time = total_time_taken; // different timining for simulation time
+	event.starttime = event.getTime(); // for actual execution time
 	requests.push(event);
 	/*if(event.get_logical_address() != 10 || event.get_event_type() != WRITE) {
 		fprintf(stderr, "In func: %s: address %ud \n", __func__, event.get_logical_address());
@@ -147,6 +152,9 @@ void Controller::add_controller_request(Event e) {
 	/*if(e.get_logical_address() != 10 || e.get_event_type() != WRITE) {
 		fprintf(stderr, "In func: %s: address %ud \n", __func__, e.get_logical_address());
 	}*/
+
+	Event* cur = &e;
+	e.ftltime = e.getTime();
 	c_mtx.lock();
 	c_requests.push(e);
 	num_c_requests++;
@@ -166,6 +174,11 @@ void Controller::consumer() {
 			temp_event = &c_requests.front();
 			event = new Event(temp_event->get_event_type(), temp_event->get_logical_address(), temp_event->get_size(), temp_event->get_start_time());
 			event->set_address(new Address(temp_event->get_logical_address(), PAGE));
+			event->starttime = temp_event->starttime;
+			event->ftltime = temp_event->ftltime;
+			event->controllertime = temp_event->controllertime;
+			event->finishtime = temp_event->finishtime;
+
 			/*if(event->get_logical_address() != 10 || event->get_event_type() != WRITE) {
 				fprintf(stderr, "In func: %s: address %ud \n", __func__, event->get_logical_address());
 				printf("is empty?? %d address %ud\n", !c_requests.empty(), c_requests.front().get_logical_address());
@@ -184,12 +197,12 @@ void Controller::consumer() {
 			//process it
 			if(event != NULL) {
 				//printf("started processing %d %d\n", i, pending_requests.load());
-				enum status ret = this->issue(*event);
-				pending_requests--;
+				//enum status ret = this->issue(*event);
+				//pending_requests--;
 				//printf("finished processing %d %d \n", i, pending_requests.load());
-				i++;
+				//i++;
 				//printf("issue returned %d\n", ret);
-				//this->addRequestToWorker(*event);
+				this->addRequestToWorker(*event);
 			}
 			//printf(" num controller consumer requests %d\n", num_c_requests);
 
@@ -256,10 +269,11 @@ void Controller_Worker::run() {
             this->requests->pop();
             this->ready = this->requests->empty(); // after processing this request the thread has no more requests pending currently
             this->requests_mutex.unlock(); // unlock the requests queue so dispatcher can add requests while we process request
+			
 			enum status ret = this->controller.issue(rq);
-			if(ret == FAILURE) {
+			//if(ret == FAILURE) {
 				pending_requests--;
-			}
+			//}
         } else {  // no requests go to sleep
             this->ready = false;
             this->requests_mutex.unlock(); // unlock requests queue and go to sleep
@@ -299,6 +313,7 @@ enum status Controller::issue(Event &event_list)
 	 * stop processing events and return failure status if any event in the 
 	 *    list fails */
 	for(cur = &event_list; cur != NULL; cur = cur -> get_next()){
+		cur->controllertime = cur->getTime();
 		cur->start_time = total_time_taken;
 		if(cur -> get_size() != 1){
 			fprintf(stderr, "Controller: %s: Received non-single-page-sized event from FTL. %\n", __func__);
@@ -361,6 +376,17 @@ enum status Controller::issue(Event &event_list)
 			//printf("time now %.20lf\n", (cur->start_time + cur->get_time_taken()));
 		}
 
+		// add to execution timining
+		cur->finishtime = cur->getTime();
+		//if(cur->ftltime < 0 || cur->starttime < 0 || cur->controllertime < 0 || cur->finishtime < 0) {
+			//printf("%ld %ld %ld %ld\n", cur->starttime, cur->ftltime, cur->controllertime, cur->finishtime);
+			//printf("%ld %ld %ld\n",(cur->ftltime - cur->starttime), (cur->controllertime - cur->ftltime), (cur->finishtime - cur->controllertime));
+			
+		//}
+		reach_ftl += (cur->ftltime - cur->starttime);
+		in_ftl += (cur->controllertime - cur->ftltime);
+		in_controller += (cur->finishtime - cur->controllertime);
+		//printf("%ld, %ld, %ld\n", reach_ftl.load(), in_ftl.load(), in_controller.load());
 		//pending_requests--;
 	}
 
@@ -392,6 +418,14 @@ double Controller::get_time_taken() {
 
 void Controller::reset_time_taken() {
 	total_time_taken = 0;
+}
+
+void Controller::get_timing(int* ptr_reach_ftl, int * ptr_in_ftl, int* ptr_in_controller)
+{
+	*ptr_reach_ftl = reach_ftl.load();
+	*ptr_in_ftl = in_ftl.load();
+	*ptr_in_controller = in_controller.load();
+
 }
 
 void Controller::translate_address(Address &address)

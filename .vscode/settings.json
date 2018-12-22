@@ -48,6 +48,7 @@
         "tuple": "cpp",
         "typeindex": "cpp",
         "utility": "cpp",
-        "iostream": "cpp"
+        "iostream": "cpp",
+        "cstdarg": "cpp"
     }
 }

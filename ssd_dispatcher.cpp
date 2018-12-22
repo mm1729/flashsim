@@ -12,7 +12,7 @@ Dispatcher::Dispatcher(const ssd::uint workers, Controller &controller, FtlParen
     std::mutex Dispatcher::workersMutex;
     std::vector<Worker*> Dispatcher::allWorkers;
     std::vector<std::thread*> Dispatcher::threads;*/
-    printf("in dispatcher\n");
+    //printf("in dispatcher\n");
     this->ftl = ftl;
     this->all_workers = new std::vector<Worker*>();
     this->threads = new std::vector<std::thread*>();
@@ -37,7 +37,7 @@ Dispatcher::Dispatcher(const ssd::uint workers, Controller &controller, FtlParen
         w = 0;
         t = 0;
     }
-    printf("initalized everything\n");
+    //printf("initalized everything\n");
     running = true;
     main_thread = new std::thread(&Dispatcher::consume, this);
 }

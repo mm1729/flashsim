@@ -188,6 +188,11 @@ double Ssd::event_arrive(enum event_type type, ulong logical_address, uint size,
 	return start_time;
 }
 
+void Ssd::get_timing(int* ptr_reach_ftl, int * ptr_in_ftl, int* ptr_in_controller) {
+	 controller.get_timing(ptr_reach_ftl, ptr_in_ftl, ptr_in_controller);
+}
+
+
 /*
  * Returns a pointer to the global buffer of the Ssd.
  * It is up to the user to not read out of bound and only

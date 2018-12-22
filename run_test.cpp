@@ -75,97 +75,45 @@ int main()
 {
 	load_config();
 	print_config(NULL);
-   //printf("Press ENTER to continue...");
-   //getchar();
-   printf("\n");
 
 	Ssd *ssd = new Ssd();
 
 	double result;
 
-//	// Test one write to some blocks.
-//	for (int i = 0; i < SIZE; i++)
-//	{
-//		/* event_arrive(event_type, logical_address, size, start_time) */
-//		result = ssd -> event_arrive(WRITE, i*100000, 1, (double) 1+(250*i));
-//
-//		printf("Write time: %.20lf\n", result);
-////		result = ssd -> event_arrive(WRITE, i+10240, 1, (double) 1);
-////
-//	}
-//	for (int i = 0; i < SIZE; i++)
-//	{
-//		/* event_arrive(event_type, logical_address, size, start_time) */
-//		result = ssd -> event_arrive(READ, i*100000, 1, (double) 1+(500*i));
-//		printf("Read time : %.20lf\n", result);
-////		result = ssd -> event_arrive(READ, i, 1, (double) 1);
-////		printf("Read time : %.20lf\n", result);
-//	}
-
-//	// Test writes and read to same block.
-//	for (int i = 0; i < SIZE; i++)
-//	{
-//		result = ssd -> event_arrive(WRITE, i%64, 1, (double) 1+(250*i));
-//
-//		printf("Write time: %.20lf\n", result);
-//	}
-//	for (int i = 0; i < SIZE; i++)
-//	{
-//		result = ssd -> event_arrive(READ, i%64, 1, (double) 1+(500*i));
-//		printf("Read time : %.20lf\n", result);
-//	}
-
-	// Test random writes to a block
-	/*result = ssd -> event_arrive(WRITE, 5, 1, (double) 0.0);
-	printf("Write time: %.20lf\n", result);
-	result = ssd -> event_arrive(WRITE, 4, 1, (double) 0.0);
-	printf("Write time: %.20lf\n", result);
-	result = ssd -> event_arrive(WRITE, 3, 1, (double) 0.0);
-	printf("Write time: %.20lf\n", result);
-	result = ssd -> event_arrive(WRITE, 2, 1, (double) 0.0);
-	printf("Write time: %.20lf\n", result);
-	result = ssd -> event_arrive(WRITE, 1, 1, (double) 0.0);
-	printf("Write time: %.20lf\n", result);
-	result = ssd -> event_arrive(WRITE, 0, 1, (double) 0.0);
-	printf("Write time: %.20lf\n", result);*/
-
 
 	std::default_random_engine generator;
 	std::uniform_int_distribution<int> distribution(1, 1048576);
 	int size;
-	uint64 before = GetTimeMs64();
-	//for (size = 2; size < 16384; size*=2) {
-		for (int i = 0; i < SIZE; i++)
-		{
-			/* event_arrive(event_type, logical_address, size, start_time) */
-			//result = ssd -> event_arrive(WRITE, 6+i, 1, (double) 1800+(300*i));
-			//result = ssd->event_arrive(READ, i, 1, (double) 0.0);
-			result = ssd->event_arrive(WRITE, distribution(generator), 1, (double) 0.0);
-			//result = ssd->event_arrive(WRITE, distribution(generator), 1, (double) 0.0);
-			//printf("Write time: %.20lf\n", result);
-		}
 
+	int reach_ftl = 0;
+	int in_ftl = 0;
+	int in_controller = 0;
 	
+	// Change num_events for different number of events
+	int num_events = 1000;
 
-		printf("sent all requests\n");
-		printf("Sim time (in microseconds) %.20lf\n", ssd->get_time_taken());
-		uint64 after = GetTimeMs64();
-		printf("Exec time (in milliseconds) %llu\n", after - before);
-		ssd->reset_time_taken();
-	//}
+	uint64 before = GetTimeMs64();
 
-	//sleep(120);
-	//printf("%.20lf\n", ssd->get_time_taken());
-	// Force Merge
-	//result = ssd -> event_arrive(WRITE, 10 , 1, (double) 0.0);
-	//printf("Write time: %.20lf\n", result);
-//	for (int i = 0; i < SIZE; i++)
-//	{
-//		/* event_arrive(event_type, logical_address, size, start_time) */
-//		result = ssd -> event_arrive(READ, i%64, 1, (double) 1+(500*i));
-//		printf("Read time : %.20lf\n", result);
-//	}
-	printf("reached end\n");
+	for (int i = 0; i < num_events; i++)
+	{
+		result += ssd->event_arrive(READ, i, 1, (double) 0.0); // seq read
+		//result += ssd->event_arrive(READ, distribution(generator), 1, (double) 0.0); // random read
+		//result += ssd->event_arrive(WRITE, distribution(generator), 1, (double) 0.0); // random write
+		//result += ssd->event_arrive(WRITE, i, 1, (double) 0.0); // seq write
+	}
+
+
+
+	//printf("sent all requests\n");
+	//printf("Sim time (in microseconds) %.20lf\n", ssd->get_time_taken());
+	ssd->get_timing(&reach_ftl, &in_ftl, &in_controller);
+	uint64 after = GetTimeMs64();
+	uint64 ftlTime = in_controller - (after - before)*1000000;
+	ftlTime /= num_events;
+	in_controller /= num_events;
+	printf("%llu %d\n", ftlTime, in_controller);
+	ssd->reset_time_taken();
+
 	delete ssd;
 	return 0;
 }

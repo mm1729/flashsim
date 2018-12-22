@@ -15,7 +15,7 @@ Worker::Worker() {
 void Worker::run() {
     //printf("in run method\n");
     bool have_requests = 0;
-    Request* rq;
+    Request* rq, *temp_rq;
     while(running) {
         //printf("in loop\n");
         this->requests_mutex.lock();
@@ -26,7 +26,14 @@ void Worker::run() {
         //printf("empty queue: %d\n", have_requests);
         if(have_requests) { // have requests process them
             rq = this->requests->front();
+
+
+            temp_rq = this->requests->front();
+            rq = new Request(temp_rq->event, temp_rq->ftl);
+
+
             this->requests->pop();
+
             this->ready = this->requests->empty(); // after processing this request the thread has no more requests pending currently
             this->requests_mutex.unlock(); // unlock the requests queue so dispatcher can add requests while we process request
             /*if(rq->getValue().get_logical_address() != 10) {

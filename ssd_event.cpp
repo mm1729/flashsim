@@ -28,6 +28,7 @@
 #include <assert.h>
 #include <stdio.h>
 #include "ssd.h"
+#include <chrono>
 
 using namespace ssd;
 
@@ -44,6 +45,10 @@ Event::Event(enum event_type type, ulong logical_address, uint size, double star
 	noop(false)
 {
 	assert(start_time >= 0.0);
+	starttime = -1;
+	ftltime = -1;
+	controllertime = -1;
+	finishtime = -1; 
 	return;
 }
 
@@ -228,6 +233,10 @@ void Event::print(FILE *stream)
 	return;
 }
 
+int64_t Event::getTime() {
+	return std::chrono::duration_cast< std::chrono::nanoseconds >(
+    std::chrono::system_clock::now().time_since_epoch()).count();
+}
 #if 0
 /* may be useful for further integration with DiskSim */
 

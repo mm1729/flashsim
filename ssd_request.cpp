@@ -32,8 +32,6 @@ void Request::process()
         this->ftl->write_(this->event);
     else if(this->event.get_event_type() == TRIM)
         this->ftl->trim(this->event);
-    else
-        fprintf(stderr, "Controller: %s: Invalid event type\n", __func__);
     
 }
 
